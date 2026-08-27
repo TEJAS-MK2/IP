@@ -5,49 +5,25 @@ const myIpBtn=document.querySelector('#myIpBtn');
 const status=document.querySelector('#status');
 const result=document.querySelector('#result');
 const copyIp=document.querySelector('#copyIp');
+const historyList=document.querySelector('#historyList');
+const clearHistory=document.querySelector('#clearHistory');
+const compareTable=document.querySelector('#compareTable');
 const fields={ip:document.querySelector('#ipValue'),city:document.querySelector('#city'),region:document.querySelector('#region'),country:document.querySelector('#country'),postal:document.querySelector('#postal'),timezone:document.querySelector('#timezone'),coords:document.querySelector('#coords'),asn:document.querySelector('#asn'),org:document.querySelector('#org'),pill:document.querySelector('#countryPill'),map:document.querySelector('#map')};
-let controller=null;
+const HISTORY_KEY='ip-tracker-history-v1';const MAX_HISTORY=8;let controller=null;let currentData=null;
 const value=v=>v===null||v===undefined||String(v).trim()===''?'—':String(v);
-function setStatus(message='',type='error'){status.textContent=message;status.className=`status${type==='error'?' status-error':type==='success'?' status-success':''}`;}
+function setStatus(message='',type=''){status.textContent=message;status.className=`status${type==='error'?' status-error':type==='success'?' status-success':''}`;}
 function setBusy(busy){lookupBtn.disabled=busy;myIpBtn.disabled=busy;lookupBtn.querySelector('.button-label').textContent=busy?'Looking up…':'Lookup';}
-function isValidIp(value){
-  const ip=value.trim();
-  if(!ip||ip.length>45)return false;
-  const parts=ip.split('.');
-  if(parts.length===4&&parts.every(p=>/^\d{1,3}$/.test(p)))return parts.every(p=>Number(p)>=0&&Number(p)<=255);
-  if(!ip.includes(':'))return false;
-  return /^[0-9a-f:]+$/i.test(ip)&&ip.includes(':')&&ip.split('::').length<=2&&ip.split(':').filter(Boolean).length<=8;
-}
-function mapUrl(lat,lon){
-  const pad=.15;
-  const west=Math.max(-180,lon-pad),east=Math.min(180,lon+pad),south=Math.max(-90,lat-pad),north=Math.min(90,lat+pad);
-  const bbox=[west,south,east,north].map(n=>n.toFixed(5)).join('%2C');
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat.toFixed(5)}%2C${lon.toFixed(5)}`;
-}
-function render(data){
-  const lat=Number(data.latitude),lon=Number(data.longitude);
-  fields.ip.textContent=value(data.ip);fields.city.textContent=value(data.city);fields.region.textContent=value(data.region);fields.country.textContent=value(data.country_name||data.country);fields.postal.textContent=value(data.postal);fields.timezone.textContent=value(data.timezone);fields.coords.textContent=Number.isFinite(lat)&&Number.isFinite(lon)?`${lat.toFixed(4)}, ${lon.toFixed(4)}`:'—';fields.asn.textContent=value(data.asn);fields.org.textContent=value(data.org);
-  fields.pill.textContent=[data.country_code,data.country_name].filter(Boolean).join(' · ')||'Unknown';
-  if(Number.isFinite(lat)&&Number.isFinite(lon))fields.map.src=mapUrl(lat,lon);else fields.map.removeAttribute('src');
-  result.classList.remove('hidden');
-}
-async function lookup(ip=''){
-  const clean=ip.trim();setStatus('');setBusy(true);if(controller)controller.abort();controller=new AbortController();
-  try{
-    const url=clean?`https://ipapi.co/${encodeURIComponent(clean)}/json/`:'https://ipapi.co/json/';
-    const response=await fetch(url,{headers:{Accept:'application/json'},signal:controller.signal,cache:'no-store'});
-    if(response.status===429)throw new Error('Too many requests. Please wait a moment and try again.');
-    if(!response.ok)throw new Error(`Lookup failed (${response.status}). Please try again.`);
-    const data=await response.json();
-    if(data.error)throw new Error(data.reason||'The IP address could not be found.');
-    if(!data.ip)throw new Error('The lookup service returned no IP address.');
-    render(data);setStatus('Lookup complete.','success');
-  }catch(error){
-    if(error.name==='AbortError')return;
-    result.classList.add('hidden');setStatus(error.message||'Something went wrong. Please try again.');
-  }finally{setBusy(false);controller=null;}
-}
-form.addEventListener('submit',event=>{event.preventDefault();const ip=input.value.trim();if(!ip)return lookup();if(!isValidIp(ip)){setStatus('Enter a valid IPv4 or IPv6 address.');input.focus();return;}lookup(ip);});
+function isValidIp(value){const ip=value.trim();if(!ip||ip.length>45)return false;const v4=ip.split('.');if(v4.length===4&&v4.every(p=>/^\d{1,3}$/.test(p)))return v4.every(p=>Number(p)>=0&&Number(p)<=255);if(!ip.includes(':')||!/^[0-9a-f:]+$/i.test(ip)||ip.split('::').length>2)return false;const [left,right]=ip.split('::');const leftParts=left?left.split(':'):[],rightParts=right?right.split(':'):[];if(leftParts.some(p=>p.length>4)||rightParts.some(p=>p.length>4))return false;return ip.includes('::')?leftParts.length+rightParts.length<8:leftParts.length===8;}
+function mapUrl(lat,lon){const pad=.15;const west=Math.max(-180,lon-pad),east=Math.min(180,lon+pad),south=Math.max(-90,lat-pad),north=Math.min(90,lat+pad);const bbox=[west,south,east,north].map(n=>n.toFixed(5)).join('%2C');return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat.toFixed(5)}%2C${lon.toFixed(5)}`;}
+function render(data){currentData=data;const lat=Number(data.latitude),lon=Number(data.longitude);fields.ip.textContent=value(data.ip);fields.city.textContent=value(data.city);fields.region.textContent=value(data.region);fields.country.textContent=value(data.country_name||data.country);fields.postal.textContent=value(data.postal);fields.timezone.textContent=value(data.timezone);fields.coords.textContent=Number.isFinite(lat)&&Number.isFinite(lon)?`${lat.toFixed(4)}, ${lon.toFixed(4)}`:'—';fields.asn.textContent=value(data.asn);fields.org.textContent=value(data.org);fields.pill.textContent=[data.country_code,data.country_name].filter(Boolean).join(' · ')||'Unknown';if(Number.isFinite(lat)&&Number.isFinite(lon))fields.map.src=mapUrl(lat,lon);else fields.map.removeAttribute('src');result.classList.remove('hidden');saveHistory(data);}
+function readHistory(){try{const parsed=JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]');return Array.isArray(parsed)?parsed:[]}catch{return[]}}
+function saveHistory(data){const item={ip:data.ip,city:data.city,region:data.region,country:data.country_name||data.country,postal:data.postal,timezone:data.timezone,asn:data.asn,org:data.org,latitude:data.latitude,longitude:data.longitude};const history=readHistory().filter(x=>x.ip!==item.ip);history.unshift(item);try{localStorage.setItem(HISTORY_KEY,JSON.stringify(history.slice(0,MAX_HISTORY)));}catch{}renderHistory();}
+function renderHistory(){const history=readHistory();if(!history.length){historyList.innerHTML='<p class="empty-history">No saved lookups yet.</p>';compareTable.innerHTML='<p class="empty-history">Save at least two lookups to compare them.</p>';return;}historyList.innerHTML=history.map((x,i)=>`<div class="history-item"><label><input type="checkbox" class="compare-check" value="${i}" ${i<2?'checked':''}><span class="history-ip">${escapeHtml(x.ip)}</span></label><span>${escapeHtml(x.city||'Unknown city')}, ${escapeHtml(x.country||'Unknown country')}</span><button type="button" class="history-lookup" data-ip="${escapeHtml(x.ip)}">Lookup</button></div>`).join('');historyList.querySelectorAll('.history-lookup').forEach(btn=>btn.addEventListener('click',()=>lookup(btn.dataset.ip)));historyList.querySelectorAll('.compare-check').forEach(box=>box.addEventListener('change',renderCompare));renderCompare();}
+function escapeHtml(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+function renderCompare(){const history=readHistory();const selected=[...document.querySelectorAll('.compare-check:checked')].map(x=>history[Number(x.value)]).filter(Boolean);if(selected.length<2){compareTable.innerHTML='<p class="empty-history">Select at least two saved lookups to compare them.</p>';return;}const rows=[['IP address','ip'],['City','city'],['Region','region'],['Country','country'],['Postal code','postal'],['Timezone','timezone'],['ASN','asn'],['Organization','org']];compareTable.innerHTML=`<div class="compare-scroll"><table><thead><tr><th>Field</th>${selected.map(x=>`<th>${escapeHtml(x.ip)}</th>`).join('')}</tr></thead><tbody>${rows.map(([label,key])=>`<tr><th>${label}</th>${selected.map(x=>`<td>${escapeHtml(value(x[key]))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;}
+async function lookup(ip=''){const clean=ip.trim();setStatus('');setBusy(true);if(controller)controller.abort();controller=new AbortController();try{const url=clean?`https://ipapi.co/${encodeURIComponent(clean)}/json/`:'https://ipapi.co/json/';const response=await fetch(url,{headers:{Accept:'application/json'},signal:controller.signal,cache:'no-store'});if(response.status===429)throw new Error('Too many requests. Please wait a moment and try again.');if(!response.ok)throw new Error(`Lookup failed (${response.status}). Please try again.`);const data=await response.json();if(data.error)throw new Error(data.reason||'The IP address could not be found.');if(!data.ip)throw new Error('The lookup service returned no IP address.');render(data);setStatus('Lookup complete.','success');}catch(error){if(error.name==='AbortError')return;result.classList.add('hidden');setStatus(error.message||'Something went wrong. Please try again.','error');}finally{setBusy(false);controller=null;}}
+form.addEventListener('submit',event=>{event.preventDefault();const ip=input.value.trim();if(!ip)return lookup();if(!isValidIp(ip)){setStatus('Enter a valid IPv4 or IPv6 address.','error');input.focus();return;}lookup(ip);});
 myIpBtn.addEventListener('click',()=>{input.value='';lookup();});
-copyIp.addEventListener('click',async()=>{const ip=fields.ip.textContent;if(!ip||ip==='—')return;try{if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(ip);else{const area=document.createElement('textarea');area.value=ip;area.style.position='fixed';area.style.opacity='0';document.body.appendChild(area);area.select();document.execCommand('copy');area.remove();}copyIp.textContent='Copied';setTimeout(()=>{copyIp.textContent='Copy';},1200);}catch{setStatus('Could not copy the IP address.');}});
-lookup();
+copyIp.addEventListener('click',async()=>{const ip=fields.ip.textContent;if(!ip||ip==='—')return;try{if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(ip);else{const area=document.createElement('textarea');area.value=ip;area.style.position='fixed';area.style.opacity='0';document.body.appendChild(area);area.select();document.execCommand('copy');area.remove();}copyIp.textContent='Copied';setTimeout(()=>{copyIp.textContent='Copy';},1200);}catch{setStatus('Could not copy the IP address.','error');}});
+clearHistory.addEventListener('click',()=>{localStorage.removeItem(HISTORY_KEY);renderHistory();});
+renderHistory();lookup();
