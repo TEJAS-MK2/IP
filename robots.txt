@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://tejas-mk2.github.io/IP/sitemap.xml
