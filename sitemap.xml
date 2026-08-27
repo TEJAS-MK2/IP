@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://tejas-mk2.github.io/IP/</loc></url>
+  <url><loc>https://tejas-mk2.github.io/IP/tools.html</loc></url>
+  <url><loc>https://tejas-mk2.github.io/IP/dns.html</loc></url>
+  <url><loc>https://tejas-mk2.github.io/IP/rdap.html</loc></url>
+  <url><loc>https://tejas-mk2.github.io/IP/user-agent.html</loc></url>
   <url><loc>https://tejas-mk2.github.io/IP/privacy.html</loc></url>
   <url><loc>https://tejas-mk2.github.io/IP/terms.html</loc></url>
   <url><loc>https://tejas-mk2.github.io/IP/thanks.html</loc></url>
